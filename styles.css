@@ -1,87 +1,87 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 #container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
 }
 
 #inputs {
-    text-align: center;
-    display: flex;
-    margin-bottom: 20px;
-    margin-top: 20px;
+  text-align: center;
+  display: flex;
+  margin-bottom: 20px;
+  margin-top: 20px;
 }
 
 #map {
-    height: 90vh;
-    width: 100vw;
+  height: 90vh;
+  width: 100vw;
 }
 
 #searchInput {
-    width: 100vw;
-    max-width: 600px;
-    height: 3em;
-    margin: 0 5px;
-    border-color: #152c4d;
-    border-radius: 15px;
-    font-size: 18px;
+  width: 100vw;
+  max-width: 600px;
+  height: 3em;
+  margin: 0 5px;
+  border-color: #152c4d;
+  border-radius: 15px;
+  font-size: 18px;
 }
 #searchInput::placeholder {
-    text-align: center;
+  text-align: center;
 }
 
 input[type="number"],
 button {
-    width: 100%;
-    max-width: 600px;
-    height: 3em;
-    margin: 0 5px;
-    border: none;
-    border-radius: 15px;
-    text-align: center;
-    font-size: 18px;
+  width: 100%;
+  max-width: 600px;
+  height: 3em;
+  margin: 0 5px;
+  border: none;
+  border-radius: 15px;
+  text-align: center;
+  font-size: 18px;
 }
 
 button#searchButton,
 button#location {
-    background-color: #152c4d;
-    color: #fff;
-    cursor: pointer;
+  background-color: #152c4d;
+  color: #fff;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {
-    #map {
-        height: 70vh;
-    }
+  #map {
+    height: 70vh;
+  }
 
-    #searchInput,
-    input[type="number"],
-    button {
-        font-size: 16px;
-    }
+  #searchInput,
+  input[type="number"],
+  button {
+    font-size: 16px;
+  }
 
-    #inputs {
-        flex-direction: column;
-        align-items: center;
-    }
+  #inputs {
+    flex-direction: column;
+    align-items: center;
+  }
 
-    #inputs img,
-    #inputs input,
-    #inputs button {
-        width: 80%;
-        max-width: 600px;
-        margin: 5px 0;
-    }
+  #inputs img,
+  #inputs input,
+  #inputs button {
+    width: 80%;
+    max-width: 600px;
+    margin: 5px 0;
+  }
 }
 
 #logo {
-    height: 3em;
-    width: 200px;
-    padding-right: 50px;
+  height: 3em;
+  width: 200px;
+  padding-right: 50px;
 }
