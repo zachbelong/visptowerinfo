@@ -9,7 +9,7 @@
 }
 
 #map {
-  height: 95vh;
+  height: 93vh;
   width: 100vw;
 }
 
@@ -25,7 +25,6 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  background-color: white;
   padding: 10px;
   width: 100vw;
 }
@@ -70,6 +69,7 @@ button#location {
 }
 
 label {
+  font-family: Arial, sans-serif;
   color: #152c4d;
   display: flex;
   align-items: center;
