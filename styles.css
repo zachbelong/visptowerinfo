@@ -1,87 +1,104 @@
+/*
+  Author: Zach Belong
+*/
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+#map {
+  height: 95vh;
+  width: 100vw;
+}
+
 #container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#navbar {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  flex-direction: column;
-}
-
-#inputs {
-  text-align: center;
-  display: flex;
-  margin-bottom: 20px;
-  margin-top: 20px;
-}
-
-#map {
-  height: 90vh;
+  background-color: white;
+  padding: 10px;
   width: 100vw;
+}
+
+#logo {
+  height: 3em;
+  width: 6em;
+  margin-right: 50px;
 }
 
 #searchInput {
-  width: 100vw;
-  max-width: 600px;
-  height: 3em;
-  margin: 0 5px;
-  border-color: #152c4d;
-  border-radius: 15px;
-  font-size: 18px;
-}
-#searchInput::placeholder {
-  text-align: center;
+  width: 20em;
+  background-color: #152c4d;
+  color: white;
 }
 
-input[type="number"],
 button {
-  width: 100%;
-  max-width: 600px;
+  width: 10em;
+}
+
+select {
+  background-color: #152c4d;
+  color: white;
+}
+
+#searchInput,
+button,
+select {
   height: 3em;
-  margin: 0 5px;
+  margin: 5px;
   border: none;
-  border-radius: 15px;
+  border-radius: 10px;
   text-align: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 button#searchButton,
 button#location {
   background-color: #152c4d;
-  color: #fff;
+  color: white;
   cursor: pointer;
+}
+
+label {
+  color: #152c4d;
+  display: flex;
+  align-items: center;
+  height: 3em;
+  margin-left: 20px;
+  text-align: center;
+  font-size: 20px;
+}
+
+input[type="checkbox"] {
+  margin-left: 1em;
+  width: 1.5em;
+  height: 3em;
+}
+
+#numTowers {
+  width: 5em;
+}
+
+::placeholder {
+  color: white;
 }
 
 @media (max-width: 768px) {
   #map {
-    height: 70vh;
+    height: 100vh;
   }
 
-  #searchInput,
-  input[type="number"],
-  button {
-    font-size: 16px;
+  #logo {
+    margin-bottom: 10px;
   }
-
-  #inputs {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  #inputs img,
-  #inputs input,
-  #inputs button {
-    width: 80%;
-    max-width: 600px;
-    margin: 5px 0;
-  }
-}
-
-#logo {
-  height: 3em;
-  width: 200px;
-  padding-right: 50px;
 }
