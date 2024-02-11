@@ -12,6 +12,12 @@
   height: 92vh;
   width: 100vw;
 }
+#visp {
+  color: #152c4d;
+}
+#hsc {
+  color: #b31414;
+}
 
 #container {
   display: flex;
