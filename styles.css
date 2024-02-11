@@ -9,7 +9,7 @@
 }
 
 #map {
-  height: 93vh;
+  height: 92vh;
   width: 100vw;
 }
 
@@ -97,9 +97,16 @@ input[type="checkbox"] {
   #map {
     height: 100vh;
   }
-
   #logo {
     margin-bottom: 10px;
     margin-right: 0;
+  }
+  input[type="checkbox"] {
+    width: 50%;
+  }
+  #searchInput,
+  button,
+  select {
+    width: 100%;
   }
 }

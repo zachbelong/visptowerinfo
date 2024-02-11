@@ -1,8 +1,7 @@
-let searchResult = null;
+let activeMarker = null;
 let currentInfoWindow = null;
-const drawnLines = [];
-const markers1 = [];
-const markers2 = [];
+const drawnItems = [];
+const markers = { markers1: [], markers2: [] };
 let map;
 
 function addMarkersToMap(markerData, markersArray, icon) {
@@ -12,7 +11,7 @@ function addMarkersToMap(markerData, markersArray, icon) {
       icon: icon,
       label: data.label,
       optimized: false,
-      map: null,
+      map: map,
     });
 
     fetch(data.infoContent)
@@ -20,15 +19,14 @@ function addMarkersToMap(markerData, markersArray, icon) {
       .then((content) => {
         const infoWindow = new google.maps.InfoWindow({
           maxWidth: 1000,
-          content: content,
+          content,
         });
-
-        marker.addListener("click", function () {
-          if (currentInfoWindow) {
-            currentInfoWindow.close();
-          }
+        marker.addListener("click", () => {
+          if (currentInfoWindow) currentInfoWindow.close();
           infoWindow.open(map, marker);
           currentInfoWindow = infoWindow;
+          // Hide all distance labels when a tower's info window is opened
+          drawnItems.forEach((item) => item.label && item.label.close());
         });
       });
 
@@ -40,114 +38,177 @@ function calculateDistance(point1, point2) {
   return google.maps.geometry.spherical.computeDistanceBetween(point1, point2);
 }
 
-function drawLinesAndLabels(startMarker, endMarker) {
-  const distance = calculateDistance(
-    startMarker.getPosition(),
-    endMarker.getPosition()
-  );
-  const line = new google.maps.Polyline({
-    path: [startMarker.getPosition(), endMarker.getPosition()],
-    geodesic: true,
-    strokeColor: "red",
-    strokeOpacity: 1.0,
-    strokeWeight: 2,
-  });
-  line.setMap(map);
+function drawLinesAndLabels(referenceMarker) {
+  clearLinesAndLabels();
 
-  const middlePoint = new google.maps.LatLng(
-    (startMarker.getPosition().lat() + endMarker.getPosition().lat()) / 2,
-    (startMarker.getPosition().lng() + endMarker.getPosition().lng()) / 2
+  const numTowers =
+    parseInt(document.getElementById("numTowers").value, 10) || Infinity;
+  const visibleMarkers = [...markers.markers1, ...markers.markers2].filter(
+    (markerInfo) => markerInfo.isVisible
   );
 
-  const distanceLabel = new google.maps.InfoWindow({
-    position: middlePoint,
-    content: `<strong>${(distance * 0.000621371).toFixed(2)} miles</strong>`,
+  // Calculate distances to all visible markers.
+  const distances = visibleMarkers.map((markerInfo) => ({
+    markerInfo,
+    distance: calculateDistance(
+      referenceMarker.getPosition(),
+      markerInfo.marker.getPosition()
+    ),
+  }));
+
+  // Filter for towers within 10 miles, sort by distance, then take the top numTowers.
+  const closestMarkers = distances
+    .filter(({ distance }) => distance <= 16093.4) // 10 miles in meters.
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, numTowers);
+
+  closestMarkers.forEach(({ markerInfo }) => {
+    const { marker } = markerInfo;
+    const distance = calculateDistance(
+      referenceMarker.getPosition(),
+      marker.getPosition()
+    );
+    const line = new google.maps.Polyline({
+      path: [referenceMarker.getPosition(), marker.getPosition()],
+      geodesic: true,
+      strokeColor: "red",
+      strokeOpacity: 1.0,
+      strokeWeight: 2,
+    });
+    line.setMap(map);
+
+    const middlePoint = google.maps.geometry.spherical.interpolate(
+      referenceMarker.getPosition(),
+      marker.getPosition(),
+      0.5
+    );
+    const distanceLabel = new google.maps.InfoWindow({
+      position: middlePoint,
+      content: `<strong>${(distance * 0.000621371).toFixed(2)} miles</strong>`,
+    });
+
+    drawnItems.push({ line, label: distanceLabel });
+
+    distanceLabel.open(map);
   });
-  distanceLabel.open(map);
-  drawnLines.push({ line, label: distanceLabel });
 }
 
 function clearLinesAndLabels() {
-  drawnLines.forEach((element) => {
-    element.line.setMap(null);
-    element.label.close();
+  drawnItems.forEach(({ line, label }) => {
+    if (line) line.setMap(null);
+    if (label) label.close();
   });
-  drawnLines.length = 0;
+  drawnItems.length = 0; // Clear the array for the next draw.
 }
 
-function toggleMarkersVisibility(markersArray) {
+function updateMarkersVisibility(markersArray, checkboxId) {
+  const isChecked = document.getElementById(checkboxId).checked;
   markersArray.forEach((markerInfo) => {
-    const { marker, isVisible } = markerInfo;
-    marker.setVisible(isVisible);
-  });
-}
-
-function updateMarkersVisibility(markersArray, checkbox) {
-  const isChecked = checkbox.checked;
-  markersArray.forEach((markerInfo) => {
-    const { marker, isVisible } = markerInfo;
-    if (!isChecked && isVisible) {
-      const index = drawnLines.findIndex((lineInfo) =>
-        lineInfo.line.getPath().getArray().includes(marker.getPosition())
-      );
-      if (index !== -1) {
-        drawnLines[index].line.setMap(null);
-        drawnLines[index].label.close();
-        drawnLines.splice(index, 1);
-      }
-    }
     markerInfo.isVisible = isChecked;
+    markerInfo.marker.setVisible(isChecked);
   });
-  toggleMarkersVisibility(markersArray);
-  updateDrawnLines();
+  if (activeMarker) drawLinesAndLabels(activeMarker); // Redraw lines only if there is an active marker
 }
 
-function updateDrawnLines() {
-  clearLinesAndLabels();
-  const searchLocation = searchResult
-    ? searchResult.getPosition()
-    : userMarker.getPosition();
-  const numTowers = parseInt(document.getElementById("numTowers").value);
+function addDragListener(marker) {
+  google.maps.event.addListener(marker, "dragend", () =>
+    drawLinesAndLabels(marker)
+  );
+}
 
-  const sortedMarkers = markers1
-    .concat(markers2)
-    .filter((markerInfo) => markerInfo.isVisible)
-    .slice()
-    .sort((a, b) => {
-      const distanceA = calculateDistance(
-        searchLocation,
-        a.marker.getPosition()
+function setupEventListeners() {
+  document
+    .getElementById("searchButton")
+    .addEventListener("click", performSearch);
+  document
+    .getElementById("location")
+    .addEventListener("click", getUserLocation);
+
+  ["visptowers", "hsctowers"].forEach((checkboxId) => {
+    document.getElementById(checkboxId).addEventListener("change", () => {
+      updateMarkersVisibility(
+        markers[checkboxId === "visptowers" ? "markers1" : "markers2"],
+        checkboxId
       );
-      const distanceB = calculateDistance(
-        searchLocation,
-        b.marker.getPosition()
-      );
-      return distanceA - distanceB;
     });
+  });
 
-  const closestMarkers = sortedMarkers.slice(0, numTowers);
+  document.getElementById("numTowers").addEventListener("change", () => {
+    if (activeMarker) drawLinesAndLabels(activeMarker); // Update lines based on numTowers change
+  });
+}
 
-  if (searchResult || userMarker) {
-    closestMarkers.forEach(function (markerInfo) {
-      const { marker } = markerInfo;
-      const distance = calculateDistance(searchLocation, marker.getPosition());
-      if (distance <= 16093.4) {
-        drawLinesAndLabels(searchResult || userMarker, marker);
+function setupMapClickListener() {
+  map.addListener("click", () => {
+    if (currentInfoWindow) {
+      currentInfoWindow.close();
+      currentInfoWindow = null;
+      drawnItems.forEach((item) => {
+        if (item.label) {
+          const distance = calculateDistance(
+            activeMarker.getPosition(),
+            item.line.getPath().getAt(1)
+          );
+          if (distance <= 16093.4) {
+            item.label.open(map);
+          }
+        }
+      });
+    }
+  });
+}
+
+function performSearch() {
+  const searchInput = document.getElementById("searchInput").value;
+  const placesService = new google.maps.places.PlacesService(map);
+  placesService.textSearch({ query: searchInput }, function (results, status) {
+    if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+      updateActiveMarker(results[0].geometry.location, "images/pin.png");
+    } else {
+      alert("Could not find location. Please try a different search term.");
+    }
+  });
+}
+
+function getUserLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        updateActiveMarker(userLocation, "images/pin.png");
+      },
+      () => {
+        alert("Geolocation failed. Please enable location services.");
       }
-    });
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
   }
 }
 
+function updateActiveMarker(location, icon) {
+  if (activeMarker) activeMarker.setMap(null); // Remove existing active marker
+  activeMarker = new google.maps.Marker({
+    position: location,
+    map: map,
+    icon: icon,
+    draggable: true,
+  });
+  addDragListener(activeMarker);
+  map.setCenter(location);
+  drawLinesAndLabels(activeMarker); // Draw lines to closest towers
+}
+
 function initMap() {
-  const mapOptions = {
+  map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 49.1925, lng: -98.0019 },
     zoom: 12,
     mapId: "422c64e430bb49e9",
-  };
+  });
 
-  map = new google.maps.Map(document.getElementById("map"), mapOptions);
-
-  // Visp Tower Info
   const markerData1 = [
     {
       lat: 49.18815,
@@ -526,267 +587,11 @@ function initMap() {
       infoContent: "towerdata/hochfeld.html",
     },
   ];
+  addMarkersToMap(markerData1, markers.markers1, "images/tower.png");
+  addMarkersToMap(markerData2, markers.markers2, "images/tower2.png");
 
-  addMarkersToMap(markerData1, markers1, "images/tower.png");
-  addMarkersToMap(markerData2, markers2, "images/tower2.png");
-
-  document.getElementById("visptowers").addEventListener("change", function () {
-    updateMarkersVisibility(markers1, this);
-  });
-
-  document.getElementById("hsctowers").addEventListener("change", function () {
-    updateMarkersVisibility(markers2, this);
-  });
-
-  const numTowersSelect = document.getElementById("numTowers");
-  numTowersSelect.addEventListener("change", function () {
-    updateDrawnLines();
-  });
-
-  markerData1.forEach((data) => {
-    const marker = new google.maps.Marker({
-      position: new google.maps.LatLng(data.lat, data.lng),
-      icon: "images/tower.png",
-      label: data.label,
-      optimized: false,
-      map: map,
-    });
-
-    fetch(data.infoContent)
-      .then((response) => response.text())
-      .then((content) => {
-        const infoWindow = new google.maps.InfoWindow({
-          maxWidth: 1000,
-          content: content,
-        });
-
-        marker.addListener("click", function () {
-          if (currentInfoWindow) {
-            currentInfoWindow.close();
-          }
-          infoWindow.open(map, marker);
-          currentInfoWindow = infoWindow;
-        });
-      });
-
-    markers1.push({ marker, isVisible: true });
-  });
-
-  markerData2.forEach((data) => {
-    const marker = new google.maps.Marker({
-      position: new google.maps.LatLng(data.lat, data.lng),
-      icon: "images/tower2.png",
-      label: data.label,
-      optimized: false,
-      map: map,
-    });
-
-    fetch(data.infoContent)
-      .then((response) => response.text())
-      .then((content) => {
-        const infoWindow = new google.maps.InfoWindow({
-          maxWidth: 1000,
-          content: content,
-        });
-
-        marker.addListener("click", function () {
-          if (currentInfoWindow) {
-            currentInfoWindow.close();
-          }
-          infoWindow.open(map, marker);
-          currentInfoWindow = infoWindow;
-        });
-      });
-
-    markers2.push({ marker, isVisible: true });
-  });
-
-  document
-    .getElementById("searchButton")
-    .addEventListener("click", function () {
-      clearLinesAndLabels();
-      const searchInput = document.getElementById("searchInput").value;
-      const placesService = new google.maps.places.PlacesService(map);
-
-      placesService.textSearch(
-        { query: searchInput },
-        function (results, status) {
-          if (
-            status === google.maps.places.PlacesServiceStatus.OK &&
-            results[0]
-          ) {
-            const location = results[0].geometry.location;
-            const newLocation = { lat: location.lat(), lng: location.lng() };
-
-            if (searchResult) {
-              searchResult.setMap(null);
-            }
-
-            searchResult = new google.maps.Marker({
-              position: newLocation,
-              map: map,
-              title: "Search Result",
-              icon: "images/pin.png",
-              draggable: true,
-            });
-
-            searchResult.addListener("dragend", function () {
-              clearLinesAndLabels();
-              const newSearchLocation = searchResult.getPosition();
-              const numTowers = parseInt(
-                document.getElementById("numTowers").value
-              );
-
-              const sortedMarkers = markers1
-                .concat(markers2)
-                .filter((markerInfo) => markerInfo.isVisible)
-                .slice()
-                .sort((a, b) => {
-                  const distanceA = calculateDistance(
-                    newSearchLocation,
-                    a.marker.getPosition()
-                  );
-                  const distanceB = calculateDistance(
-                    newSearchLocation,
-                    b.marker.getPosition()
-                  );
-                  return distanceA - distanceB;
-                });
-
-              const closestMarkers = sortedMarkers.slice(0, numTowers);
-
-              if (searchResult) {
-                closestMarkers.forEach(function (markerInfo) {
-                  const { marker } = markerInfo;
-                  const distance = calculateDistance(
-                    newSearchLocation,
-                    marker.getPosition()
-                  );
-                  if (distance <= 16093.4) {
-                    drawLinesAndLabels(searchResult, marker);
-                  }
-                });
-              }
-            });
-
-            map.setCenter(newLocation);
-            map.setZoom(12);
-
-            const numTowers = parseInt(
-              document.getElementById("numTowers").value
-            );
-
-            const sortedMarkers = markers1
-              .concat(markers2)
-              .filter((markerInfo) => markerInfo.isVisible)
-              .slice()
-              .sort((a, b) => {
-                const distanceA = calculateDistance(
-                  searchResult.getPosition(),
-                  a.marker.getPosition()
-                );
-                const distanceB = calculateDistance(
-                  searchResult.getPosition(),
-                  b.marker.getPosition()
-                );
-                return distanceA - distanceB;
-              });
-
-            const closestMarkers = sortedMarkers.slice(0, numTowers);
-
-            closestMarkers.forEach(function (markerInfo) {
-              const { marker } = markerInfo;
-              const distance = calculateDistance(
-                searchResult.getPosition(),
-                marker.getPosition()
-              );
-              if (distance <= 16093.4) {
-                drawLinesAndLabels(searchResult, marker);
-              }
-            });
-          } else {
-            alert(
-              "Could not find location. Please try a different search term."
-            );
-          }
-        }
-      );
-    });
-
-  document.getElementById("location").addEventListener("click", function () {
-    clearLinesAndLabels();
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function (position) {
-          const userLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          getLocation(userLocation);
-          map.setCenter(userLocation);
-          map.setZoom(12);
-        },
-        function (error) {
-          if (error.code === 1) {
-            navigator.geolocation.getCurrentPosition(
-              function () {},
-              function () {},
-              { enableHighAccuracy: true }
-            );
-          }
-        }
-      );
-    } else {
-      alert("You must enable location to use this");
-    }
-  });
-
-  let userMarker;
-
-  function getLocation(location) {
-    const numTowers = parseInt(document.getElementById("numTowers").value);
-
-    const sortedMarkers = markers1
-      .concat(markers2)
-      .filter((markerInfo) => markerInfo.isVisible)
-      .slice()
-      .sort((a, b) => {
-        const distanceA = calculateDistance(location, a.marker.getPosition());
-        const distanceB = calculateDistance(location, b.marker.getPosition());
-        return distanceA - distanceB;
-      });
-
-    const closestMarkers = sortedMarkers.slice(0, numTowers);
-
-    if (userMarker) {
-      userMarker.setMap(null);
-    }
-
-    userMarker = new google.maps.Marker({
-      position: location,
-      map: map,
-      icon: "images/pin.png",
-      title: "User Location",
-      draggable: true,
-    });
-
-    userMarker.addListener("dragend", function () {
-      clearLinesAndLabels();
-      getLocation(userMarker.getPosition());
-    });
-
-    if (userMarker) {
-      closestMarkers.forEach(function (markerInfo) {
-        const { marker } = markerInfo;
-        const distance = calculateDistance(location, marker.getPosition());
-        if (distance <= 16093.4) {
-          drawLinesAndLabels(userMarker, marker);
-        }
-      });
-      map.setCenter(location);
-      map.setZoom(12);
-    }
-  }
+  setupEventListeners();
+  setupMapClickListener();
 }
 
 initMap();
