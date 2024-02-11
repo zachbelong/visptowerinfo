@@ -47,56 +47,62 @@ function drawLinesAndLabels(referenceMarker) {
     (markerInfo) => markerInfo.isVisible
   );
 
-  // Calculate distances to all visible markers.
   const distances = visibleMarkers.map((markerInfo) => ({
     markerInfo,
-    distance: calculateDistance(
+    distance: google.maps.geometry.spherical.computeDistanceBetween(
       referenceMarker.getPosition(),
       markerInfo.marker.getPosition()
     ),
   }));
 
-  // Filter for towers within 10 miles, sort by distance, then take the top numTowers.
   const closestMarkers = distances
-    .filter(({ distance }) => distance <= 16093.4) // 10 miles in meters.
+    .filter(({ distance }) => distance <= 16093.4) // 10 miles in meters
     .sort((a, b) => a.distance - b.distance)
     .slice(0, numTowers);
 
-  closestMarkers.forEach(({ markerInfo }) => {
+  closestMarkers.forEach(({ markerInfo, distance }) => {
     const { marker } = markerInfo;
-    const distance = calculateDistance(
-      referenceMarker.getPosition(),
-      marker.getPosition()
-    );
     const line = new google.maps.Polyline({
       path: [referenceMarker.getPosition(), marker.getPosition()],
       geodesic: true,
-      strokeColor: "red",
+      strokeColor: "#0099FF",
       strokeOpacity: 1.0,
       strokeWeight: 2,
     });
     line.setMap(map);
+    drawnItems.push(line); // Store line for later removal
 
-    const middlePoint = google.maps.geometry.spherical.interpolate(
+    const midpoint = google.maps.geometry.spherical.interpolate(
       referenceMarker.getPosition(),
       marker.getPosition(),
       0.5
     );
-    const distanceLabel = new google.maps.InfoWindow({
-      position: middlePoint,
-      content: `<strong>${(distance * 0.000621371).toFixed(2)} miles</strong>`,
+    const distanceLabel = new google.maps.Marker({
+      position: midpoint,
+      map: map,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 0, // Makes the icon invisible
+      },
+      label: {
+        text: `${(distance * 0.000621371).toFixed(2)} mi`,
+        color: "red",
+        fontSize: "14px",
+        fontWeight: "600",
+      },
     });
-
-    drawnItems.push({ line, label: distanceLabel });
-
-    distanceLabel.open(map);
+    drawnItems.push(distanceLabel); // Store label for later removal
   });
 }
 
 function clearLinesAndLabels() {
-  drawnItems.forEach(({ line, label }) => {
-    if (line) line.setMap(null);
-    if (label) label.close();
+  drawnItems.forEach((item) => {
+    if (
+      item instanceof google.maps.Polyline ||
+      item instanceof google.maps.Marker
+    ) {
+      item.setMap(null);
+    }
   });
   drawnItems.length = 0; // Clear the array for the next draw.
 }
